@@ -34,7 +34,9 @@ public class MainActivity extends AppCompatActivity {
 //    Constants / Parameters
     final int MIN_DURATION = 15;
     final int MAX_DURATION = 25;
-    final int PROGRESS_FPS = 20;
+    final int PROGRESS_FPS = 20;  // frame count per second (not accurate)
+    final int DEBRIS_FPS = 1;  // frame count per second to generate debris
+    final int DEBRIS_COUNT_PERFRAME = 20;  // debris count per debris timestep
 
 //    Get Objects
     ImageView blackhole, halo, blackholeHalo, whiteScreen, seed, seedHalo;
@@ -51,6 +53,8 @@ public class MainActivity extends AppCompatActivity {
 //    Flags
     boolean doBlackholeHaloAnimation = false;
     boolean doNebulaAnimation = false;
+    boolean doDebrisCreation = false;
+    boolean doAbsorbAnimation = false;
     int progress;
 
 //    Status List
@@ -87,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
 
 //        configure halo size
         DisplayMetrics displayMetrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
         height = displayMetrics.heightPixels;
         width = displayMetrics.widthPixels;
         int radius = (int)Math.sqrt(Math.pow(height, 2) + Math.pow(width, 2))*2;
@@ -128,7 +132,6 @@ public class MainActivity extends AppCompatActivity {
 
 //                        Randomly select run duration (10 ~ 30 sec)
                         duration = getDuration();
-
 //                        clear cache directory
                         Handler cacheHandler = new Handler();
                         cacheHandler.post(
@@ -141,23 +144,9 @@ public class MainActivity extends AppCompatActivity {
                         );
 
 //                        Animation
-                        absorbAnimation(duration);
+                        absorbAnimation();
                         runProgress();
-                        for (int i = 0; i<500; i++) {
-                            createDebris();
-                        }
-
-//                        Explode Blackhole
-                        Handler handler = new Handler();
-                        handler.postDelayed(
-                                new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        doBlackholeHaloAnimation = false;
-                                        explodeAnimation();
-                                    }
-                                }
-                        , duration*1000);
+                        runDebris();
                     }
                 }
         );
@@ -289,17 +278,31 @@ public class MainActivity extends AppCompatActivity {
                 new Runnable() {
                     @Override
                     public void run() {
-//                        update status
-                        int pointer = (int) (((float)progress / PROGRESS_FPS) / statusInterval);
-                        if (pointer < statusList.length) {
-                            status.setText(statusList[pointer]);
-                        }
 
 //                        update progressbar
                         progressBar.setProgress(progress);
                         progress++;
                         if (progress <= duration*PROGRESS_FPS) {
                             handler.postDelayed(this, 1000/PROGRESS_FPS);
+                            //  update status
+                            int pointer = (int) (((float)progress / PROGRESS_FPS) / statusInterval);
+                            if (pointer < statusList.length) {
+                                status.setText(statusList[pointer]);
+                            }
+                        }else {
+                            // Explode Black hole
+                            doDebrisCreation = false;
+                            doBlackholeHaloAnimation = false;
+                            doAbsorbAnimation = false;
+                            Handler explodeHandler = new Handler();
+                            explodeHandler.postDelayed(
+                                    new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            explodeAnimation();
+                                        }
+                                    }
+                            , 1000);
                         }
                     }
                 }
@@ -308,7 +311,7 @@ public class MainActivity extends AppCompatActivity {
 
 //    blackhole explode animation
     public void explodeAnimation() {
-//        Rapid Expand Blackhole & its Halo
+//        Rapid Expand Blackhole
         Animation drasticExpand = new ScaleAnimation(1f, 3f, 1f, 3f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         drasticExpand.setDuration(1500);
         drasticExpand.setFillAfter(true);
@@ -465,13 +468,59 @@ public class MainActivity extends AppCompatActivity {
     }
 
     //    Do N round of blackhole and halo animation
-    public void absorbAnimation(int repeatCount) {
+    public void absorbAnimation() {
+        doAbsorbAnimation = true;
+
 //        Halo absorb
         Animation haloShrink = new ScaleAnimation(1f, 0.05f, 1f, 0.05f, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         haloShrink.setDuration(1000);
-        haloShrink.setRepeatCount(repeatCount);
+        haloShrink.setRepeatCount(Animation.INFINITE);
+
+        haloShrink.setAnimationListener(
+                new Animation.AnimationListener() {
+                    @Override
+                    public void onAnimationStart(Animation animation) {
+
+                    }
+
+                    @Override
+                    public void onAnimationEnd(Animation animation) {
+
+                    }
+
+                    @Override
+                    public void onAnimationRepeat(Animation animation) {
+                        if (!doAbsorbAnimation) {
+//                            stop animation
+                            halo.clearAnimation();
+                        }
+                    }
+                }
+        );
 
         halo.startAnimation(haloShrink);
+    }
+
+//    Continously generate debris while running
+    public void runDebris() {
+        doDebrisCreation = true;
+
+        final Handler handler = new Handler();
+        handler.postDelayed(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        if (doDebrisCreation) {
+//                            run until progress finish
+                            handler.postDelayed(this, 1000/DEBRIS_FPS);
+//                            create debris
+                            for (int i = 0;i < DEBRIS_COUNT_PERFRAME;i++) {
+                                createDebris();
+                            }
+                        }
+                    }
+                }
+        , 1000);
     }
 
 //    Randomly generate a debris , and set the animation
@@ -519,7 +568,7 @@ public class MainActivity extends AppCompatActivity {
                                 , blackhole.getY() + blackhole.getHeight()/2 - debris.getY() - debris.getHeight()/2);
                         translate.setInterpolator(new AccelerateInterpolator(2f));
                         translate.setDuration(1000);
-                        translate.setStartOffset(random.nextInt(duration*1000));
+                        translate.setStartOffset(random.nextInt(1000/DEBRIS_FPS));
                         translate.setFillAfter(true);
                         translate.setAnimationListener(
                                 new Animation.AnimationListener() {

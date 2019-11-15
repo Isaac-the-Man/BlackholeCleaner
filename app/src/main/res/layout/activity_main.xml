@@ -146,8 +146,11 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/nebulaHalo"/>
 
+    <!--  Testing ID: ca-app-pub-3940256099942544/6300978111  -->
+    <!--  Production ID: ca-app-pub-6915183227316429/4729989839  -->
     <com.google.android.gms.ads.AdView
         android:id="@+id/adView"
+        android:elevation="10dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
